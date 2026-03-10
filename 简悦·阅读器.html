@@ -1,0 +1,1244 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🌐简悦 · 阅读器 </title>
+    <style>
+        /* === 重置与基础 === */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: #1a2632;
+            height: 100vh;
+            width: 100vw;
+            display: flex;
+            overflow: hidden;
+        }
+
+        .reader-app {
+            width: 100vw;
+            height: 100vh;
+            background: white;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* ----- 阅读核心区 (占满空间，无多余留白) ----- */
+        .reader-content {
+            flex: 1 1 100%;
+            background: #fefcf5;
+            overflow-y: auto;
+            font-size: 16px;
+            font-family: 'Georgia', 'Times New Roman', serif;
+            line-height: 1.6;
+            letter-spacing: 0.3px;
+            padding: 24px 200px;          /* 左右边距大，上下边距小 */
+            transition: background 0.1s, color 0.1s;
+            scroll-behavior: auto;
+            transform: translateZ(0);
+            cursor: default;
+            margin: 0;
+            border: none;
+            width: 100%;
+            height: 100%;
+        }
+
+        .text-line {
+            margin-bottom: 24px;            /* 段距，可通过滑块调节 */
+            word-break: break-word;
+            transition: background-color 0.2s;
+        }
+
+        .text-line.highlight {
+            background-color: rgba(255, 235, 150, 0.5);
+            border-radius: 4px;
+        }
+
+        .placeholder-tip {
+            color: #a1bad2;
+            font-style: italic;
+            text-align: center;
+            margin-top: 3em;
+            font-size: 0.9rem;
+        }
+
+        /* ----- 顶部栏 (悬浮，默认隐藏) ----- */
+        .top-bar {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: #ffffff;
+            border-bottom: 1px solid #e2e8f0;
+            padding: 0 12px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            min-height: 34px;
+            z-index: 30;
+            transform: translateY(0);
+            transition: transform 0.2s ease, opacity 0.2s ease;
+            opacity: 1;
+            pointer-events: auto;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        }
+
+        .top-bar.hidden-bar {
+            transform: translateY(-100%);
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        /* 文件信息组 */
+        .file-box {
+            display: flex;
+            align-items: center;
+            background: #f7f9fc;
+            border-radius: 30px;
+            border: 1px solid #dde5ed;
+            padding: 1px 1px 1px 2px;
+            min-width: 180px;
+            margin-right: auto;
+        }
+
+        .file-btn {
+            background: #eef2f6;
+            border: none;
+            color: #2c3e50;
+            padding: 2px 10px;
+            border-radius: 30px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            cursor: pointer;
+            white-space: nowrap;
+            line-height: 1.4;
+        }
+
+        .file-btn:hover {
+            background: #e2e8f0;
+        }
+
+        .file-name {
+            font-weight: 500;
+            color: #4a5568;
+            max-width: 300px;
+            min-width: 80px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            padding: 0 6px;
+            font-size: 0.75rem;
+            flex: 1;
+        }
+
+        /* 编码选择器 */
+        .encoding-wrapper {
+            display: flex;
+            align-items: center;
+            background: #f7f9fc;
+            border: 1px solid #dde5ed;
+            border-radius: 30px;
+            padding: 1px 2px 1px 6px;
+            height: 24px;
+        }
+
+        .encoding-select {
+            border: none;
+            background: transparent;
+            font-size: 0.7rem;
+            font-weight: 500;
+            color: #334155;
+            outline: none;
+            padding: 1px 2px;
+            cursor: pointer;
+            width: 58px;
+        }
+
+        /* 通用按钮样式 */
+        .tts-settings-btn,
+        .settings-btn {
+            background: #f7f9fc;
+            border: 1px solid #dde5ed;
+            border-radius: 30px;
+            padding: 2px 10px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: #2c3e50;
+            cursor: pointer;
+            white-space: nowrap;
+            height: 24px;
+            line-height: 1.4;
+            display: inline-flex;
+            align-items: center;
+        }
+
+        .tts-settings-btn:hover,
+        .settings-btn:hover {
+            background: #e2e8f0;
+        }
+
+        .tts-settings-btn.active {
+            background: #e2e8f0;
+            border-color: #cbd5e1;
+        }
+
+        /* ----- 听书设置面板 (悬浮) ----- */
+        .tts-settings-panel {
+            position: absolute;
+            top: 42px;                      /* 紧贴顶部栏下方 */
+            right: 12px;
+            width: 280px;
+            background: #ffffff;
+            border-radius: 16px;
+            box-shadow: 0 16px 24px -10px rgba(0, 0, 0, 0.2), 0 0 0 1px #e2e8f0;
+            z-index: 40;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-8px);
+            transition: 0.12s ease;
+            padding: 18px;
+            pointer-events: none;
+        }
+
+        .tts-settings-panel.open {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+            pointer-events: auto;
+        }
+
+        .tts-setting-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 18px;
+            width: 100%;
+        }
+
+        .tts-setting-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .tts-setting-row label {
+            font-size: 0.8rem;
+            color: #334155;
+            font-weight: 500;
+            width: 40px;
+            flex-shrink: 0;
+        }
+
+        .tts-setting-row.voice-row label {
+            width: 40px;
+        }
+
+        .tts-setting-row input[type="range"] {
+            flex: 1;
+            min-width: 140px;
+            height: 24px;
+            background: transparent;
+            accent-color: #0284c7;
+        }
+
+        .tts-setting-row .value-display {
+            font-size: 0.8rem;
+            color: #0c4a6e;
+            font-weight: 600;
+            width: 48px;
+            text-align: right;
+            flex-shrink: 0;
+            background: #e6f0fa;
+            padding: 3px 6px;
+            border-radius: 20px;
+            display: inline-block;
+            letter-spacing: 0.3px;
+        }
+
+        .tts-voice-select {
+            flex: 1;
+            border: 1px solid #d4dce8;
+            border-radius: 30px;
+            padding: 6px 10px;
+            background: #ffffff;
+            font-size: 0.8rem;
+            color: #1e3a5f;
+            font-weight: 500;
+            cursor: pointer;
+            outline: none;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23334155' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 8px center;
+            background-size: 14px;
+        }
+
+        .tts-voice-select:hover {
+            border-color: #8ba0bb;
+        }
+
+        /* ----- 显示设置面板 (悬浮) ----- */
+        .settings-overlay {
+            position: absolute;
+            top: 42px;
+            right: 12px;
+            width: 360px;
+            max-width: calc(100% - 24px);
+            background: #ffffff;
+            border-radius: 20px;
+            box-shadow: 0 20px 28px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px #d9e2ef;
+            z-index: 40;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-8px);
+            transition: 0.12s ease;
+            display: flex;
+            flex-direction: column;
+            max-height: calc(100% - 80px);
+            overflow: hidden;
+            pointer-events: none;
+        }
+
+        .settings-overlay.open {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+            pointer-events: auto;
+        }
+
+        .settings-scroll {
+            overflow-y: auto;
+            flex: 1;
+            padding: 20px 18px;
+            scroll-behavior: smooth;
+        }
+
+        .setting-group {
+            margin-bottom: 28px;
+            border-bottom: 1px dashed #e9edf3;
+            padding-bottom: 12px;
+        }
+
+        .setting-group:last-child {
+            border-bottom: none;
+            margin-bottom: 8px;
+        }
+
+        .group-label {
+            font-weight: 700;
+            color: #1e3a5f;
+            font-size: 0.8rem;
+            letter-spacing: 0.5px;
+            margin-bottom: 14px;
+            text-transform: uppercase;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            border-left: 4px solid #0284c7;
+            padding-left: 10px;
+            background: linear-gradient(to right, #f9fcff, transparent);
+        }
+
+        /* 主题色块 */
+        .theme-circles {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .theme-circle {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            border: 2px solid #e2e8f0;
+            cursor: pointer;
+            transition: 0.1s;
+        }
+
+        .theme-circle.selected {
+            border-color: #1e3a5f;
+            transform: scale(1.08);
+            box-shadow: 0 2px 6px rgba(0, 55, 100, 0.2);
+        }
+
+        /* 字体选择行 */
+        .font-select-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 18px;
+        }
+
+        .font-select-row select {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid #d4dce8;
+            border-radius: 40px;
+            background: #ffffff;
+            font-size: 0.9rem;
+            color: #1f2a44;
+            cursor: pointer;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+        }
+
+        .font-select-row select:hover {
+            border-color: #8ba0bb;
+        }
+
+        /* 滑块行 */
+        .slider-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+            width: 100%;
+        }
+
+        .slider-row input[type="range"] {
+            flex: 1;
+            min-width: 140px;
+            height: 24px;
+            background: transparent;
+            accent-color: #0284c7;
+        }
+
+        .slider-row .value-badge {
+            font-size: 0.8rem;
+            color: #035d8f;
+            font-weight: 600;
+            width: 48px;
+            text-align: right;
+            flex-shrink: 0;
+            background: #e2edf9;
+            padding: 3px 6px;
+            border-radius: 20px;
+            display: inline-block;
+            letter-spacing: 0.3px;
+        }
+
+        /* 重置按钮 */
+        .reset-btn {
+            background: #f2f6fb;
+            border: 1px solid #cdddec;
+            border-radius: 40px;
+            padding: 8px 14px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #1e3a5f;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 16px;
+            letter-spacing: 0.3px;
+            transition: 0.1s;
+        }
+
+        .reset-btn:hover {
+            background: #e3ecf5;
+            border-color: #9cb4d1;
+        }
+
+        /* ----- 底部栏 (悬浮，默认隐藏) ----- */
+        .bottom-bar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: #ffffff;
+            border-top: 1px solid #e2e8f0;
+            padding: 0 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-height: 38px;
+            z-index: 30;
+            transform: translateY(0);
+            transition: transform 0.2s ease, opacity 0.2s ease;
+            opacity: 1;
+            pointer-events: auto;
+            box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.08);
+        }
+
+        .bottom-bar.hidden-bar {
+            transform: translateY(100%);
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        /* 进度条区域 */
+        .bottom-progress {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: #f7f9fc;
+            border-radius: 30px;
+            border: 1px solid #dde5ed;
+            padding: 1px 1px 1px 10px;
+            height: 28px;
+        }
+
+        .progress-indicator span {
+            background: #eef2f6;
+            padding: 2px 8px;
+            border-radius: 30px;
+            font-family: 'Fira Code', monospace;
+            color: #2c3e50;
+            font-size: 0.8rem;
+            font-weight: 500;
+            display: inline-block;
+            min-width: 62px;
+            text-align: center;
+            line-height: 1.5;
+        }
+
+        .progress-slider {
+            flex: 1;
+            min-width: 100px;
+            display: flex;
+            align-items: center;
+            height: 100%;
+        }
+
+        .progress-slider input {
+            width: 75%;
+            height: 4px;
+            background: #d0d9e6;
+            border-radius: 2px;
+            -webkit-appearance: none;
+            margin: 0 auto;
+            accent-color: #64748b;
+        }
+
+        .progress-slider input::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 12px;
+            height: 12px;
+            background: white;
+            border: 2px solid #94a3b8;
+            border-radius: 50%;
+            cursor: pointer;
+            margin-top: -4px;
+        }
+
+        /* 播放控制按钮组 */
+        .playback-controls {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            background: #f7f9fc;
+            border-radius: 30px;
+            border: 1px solid #dde5ed;
+            padding: 2px 4px;
+            height: 28px;
+        }
+
+        .playback-btn {
+            background: transparent;
+            border: none;
+            padding: 2px 10px;
+            border-radius: 30px;
+            font-size: 0.7rem;
+            font-weight: 500;
+            color: #2c3e50;
+            cursor: pointer;
+            white-space: nowrap;
+            line-height: 1.4;
+            height: 22px;
+            display: flex;
+            align-items: center;
+        }
+
+        .playback-btn:hover {
+            background: #e2e8f0;
+        }
+
+        .playback-btn.speaking {
+            background: #dff0fa;
+            color: #1e4a6e;
+        }
+
+        .playback-btn.exit {
+            color: #b91c1c;
+        }
+
+        .playback-btn.exit:hover {
+            background: #fee2e2;
+        }
+
+        /* 加载遮罩 */
+        .loading-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(4px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 50;
+            transition: opacity 0.2s;
+        }
+
+        .loading-spinner {
+            background: white;
+            padding: 8px 16px;
+            border-radius: 40px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border: 1px solid #e2e8f0;
+            font-size: 0.7rem;
+        }
+
+        .loading-spinner::after {
+            content: '';
+            width: 12px;
+            height: 12px;
+            border: 2px solid #e2e8f0;
+            border-top-color: #64748b;
+            border-radius: 50%;
+            animation: spinner 0.8s linear infinite;
+        }
+
+        @keyframes spinner {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* 透明背景层，用于点击关闭设置面板 */
+        .overlay-backdrop {
+            position: fixed;
+            inset: 0;
+            z-index: 29;
+            display: none;
+            background: transparent;
+        }
+
+        .overlay-backdrop.show {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+<div class="reader-app">
+    <!-- 点击关闭设置面板的透明层 -->
+    <div class="overlay-backdrop" id="settingsBackdrop"></div>
+
+    <!-- 听书设置面板 (悬浮) -->
+    <div class="tts-settings-panel" id="ttsSettingsPanel">
+        <div class="tts-setting-row voice-row">
+            <label>音色</label>
+            <select class="tts-voice-select" id="ttsVoiceSelect">
+                <option value="希希">希希 (xiaoxiao)</option>
+                <option value="辉辉">辉辉 (huihui)</option>
+                <option value="瑶瑶">瑶瑶 (yaoyao)</option>
+                <option value="铮铮">铮铮 (zhengzheng)</option>
+                <option value="薇薇">薇薇 (weiwei)</option>
+                <option value="彬彬">彬彬 (binbin)</option>
+            </select>
+        </div>
+        <div class="tts-setting-row">
+            <label>语速</label>
+            <input type="range" id="ttsRate" min="0.5" max="2.0" value="1.0" step="0.1">
+            <span class="value-display" id="ttsRateValue">100%</span>
+        </div>
+        <div class="tts-setting-row">
+            <label>音量</label>
+            <input type="range" id="ttsVolume" min="0" max="100" value="100" step="1">
+            <span class="value-display" id="ttsVolumeValue">100%</span>
+        </div>
+    </div>
+
+    <!-- 顶部悬浮栏 (默认隐藏) -->
+    <div class="top-bar hidden-bar" id="topBar">
+        <div class="file-box">
+            <button class="file-btn" id="selectFileBtn">选择TXT</button>
+            <span class="file-name" id="fileNameDisplay">未加载</span>
+        </div>
+        <div class="encoding-wrapper">
+            <select class="encoding-select" id="mainEncodingSelector">
+                <option value="utf-8">UTF-8</option>
+                <option value="gbk">GBK</option>
+                <option value="gb2312">GB2312</option>
+                <option value="big5">BIG5</option>
+            </select>
+        </div>
+        <button class="tts-settings-btn" id="ttsSettingsBtn">听书设置</button>
+        <button class="settings-btn" id="toggleSettingsBtn">显示设置</button>
+    </div>
+
+    <!-- 显示设置面板 (悬浮) — 已移除“上下间距”滑块 -->
+    <div class="settings-overlay" id="settingsOverlay">
+        <div class="settings-scroll" id="settingsScroll">
+            <!-- 主题背景组 -->
+            <div class="setting-group">
+                <div class="group-label">主题 · 背景</div>
+                <div class="theme-circles" id="themeCircles">
+                    <div class="theme-circle selected" data-bg="#fefcf5" data-text="#1f2a3f" style="background:#fefcf5;"></div>
+                    <div class="theme-circle" data-bg="#eadccf" data-text="#5b4636" style="background:#eadccf;"></div>
+                    <div class="theme-circle" data-bg="#1d2e41" data-text="#e0e9f5" style="background:#1d2e41;"></div>
+                    <div class="theme-circle" data-bg="#e8f0e8" data-text="#2f4b3a" style="background:#e8f0e8;"></div>
+                    <div class="theme-circle" data-bg="#f2eed7" data-text="#8b6b4d" style="background:#f2eed7;"></div>
+                    <div class="theme-circle" data-bg="#d9e6f2" data-text="#1f4a6e" style="background:#d9e6f2;"></div>
+                    <div class="theme-circle" data-bg="#3a2e28" data-text="#dccbbf" style="background:#3a2e28;"></div>
+                    <div class="theme-circle" data-bg="#f6e9e3" data-text="#803e5a" style="background:#f6e9e3;"></div>
+                </div>
+            </div>
+
+            <!-- 字体字号组 -->
+            <div class="setting-group">
+                <div class="group-label">字体 · 字号</div>
+                <div class="font-select-row">
+                    <label>字体</label>
+                    <select id="fontFamilySelect">
+                        <option value="'宋体', SimSun, serif" style="font-family:'宋体', SimSun, serif;">宋体</option>
+                        <option value="'仿宋', FangSong, serif" style="font-family:'仿宋', FangSong, serif;">仿宋</option>
+                        <option value="'楷体', KaiTi, serif" style="font-family:'楷体', KaiTi, serif;">楷体</option>
+                        <option value="'苹方', 'PingFang SC', sans-serif" style="font-family:'苹方', 'PingFang SC', sans-serif;">苹方</option>
+                        <option value="'微软雅黑', 'Segoe UI', Roboto, sans-serif" style="font-family:'微软雅黑', 'Segoe UI', Roboto, sans-serif;">微软雅黑</option>
+                        <option value="'黑体', 'Helvetica Neue', sans-serif" style="font-family:'黑体', 'Helvetica Neue', sans-serif;">黑体</option>
+                        <option value="'华文楷体', 'Palatino', serif" style="font-family:'华文楷体', 'Palatino', serif;">华文楷体</option>
+                        <option value="'思源宋体', 'Source Han Serif', serif" style="font-family:'思源宋体', 'Source Han Serif', serif;">思源宋体</option>
+                        <option value="'Georgia', 'Times New Roman', serif" style="font-family:'Georgia', 'Times New Roman', serif;">Georgia</option>
+                        <option value="'Times New Roman', serif" style="font-family:'Times New Roman', serif;">Times New Roman</option>
+                        <option value="'Arial', sans-serif" style="font-family:'Arial', sans-serif;">Arial</option>
+                        <option value="'Verdana', sans-serif" style="font-family:'Verdana', sans-serif;">Verdana</option>
+                        <option value="'Consolas', monospace" style="font-family:'Consolas', monospace;">Consolas</option>
+                        <option value="'Courier New', monospace" style="font-family:'Courier New', monospace;">Courier New</option>
+                        <option value="'Palatino', '华文楷体', serif" style="font-family:'Palatino', '华文楷体', serif;">Palatino</option>
+                    </select>
+                </div>
+                <div class="slider-row">
+                    <label>字号</label>
+                    <input type="range" id="fontSizeSlider" min="8" max="48" value="18" step="1">
+                    <span class="value-badge" id="fontSizeValue">18</span>
+                </div>
+            </div>
+
+            <!-- 间距组 (已移除上下边距滑块，保留行距、字距、段距、左右边距) -->
+            <div class="setting-group">
+                <div class="group-label">间距 · 边距</div>
+                <div class="slider-row">
+                    <label>行距</label>
+                    <input type="range" id="lineHeightSlider" min="1.0" max="4.0" value="1.6" step="0.1">
+                    <span class="value-badge" id="lineHeightValue">1.6</span>
+                </div>
+                <div class="slider-row">
+                    <label>字距</label>
+                    <input type="range" id="letterSpacingSlider" min="-1.0" max="5.0" value="0.3" step="0.1">
+                    <span class="value-badge" id="letterSpacingValue">0.3</span>
+                </div>
+                <div class="slider-row">
+                    <label>段距</label>
+                    <input type="range" id="paraMarginSlider" min="0" max="80" value="24" step="2">
+                    <span class="value-badge" id="paraMarginValue">24</span>
+                </div>
+                <div class="slider-row">
+                    <label>左右</label>
+                    <input type="range" id="paddingXSlider" min="40" max="480" value="200" step="10">
+                    <span class="value-badge" id="paddingXValue">200</span>
+                </div>
+                <!-- 上下间距滑块已删除 -->
+                <button class="reset-btn" id="resetSpacingBtn">恢复默认间距</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 阅读核心区 —— 占满剩余空间，无白边 -->
+    <div class="reader-content" id="readerContent">
+        <div class="placeholder-tip">选择一个TXT文件</div>
+    </div>
+
+    <!-- 底部悬浮栏 (默认隐藏) -->
+    <div class="bottom-bar hidden-bar" id="bottomBar">
+        <div class="bottom-progress">
+            <div class="progress-indicator"><span id="progressValue">0.00%</span></div>
+            <div class="progress-slider"><input type="range" id="progressSlider" min="0" max="100" value="0" step="0.01"></div>
+        </div>
+        <div class="playback-controls">
+            <button class="playback-btn" id="playPauseBtn">播放</button>
+            <button class="playback-btn exit" id="exitTtsBtn">退出</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    (function() {
+        // ---------- DOM 元素 ----------
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.accept = '.txt,text/plain';
+        fileInput.style.display = 'none';
+        document.body.appendChild(fileInput);
+
+        const selectFileBtn = document.getElementById('selectFileBtn');
+        const fileNameDisplay = document.getElementById('fileNameDisplay');
+        const progressValueSpan = document.getElementById('progressValue');
+        const progressSlider = document.getElementById('progressSlider');
+        const readerDiv = document.getElementById('readerContent');
+        const mainEncodingSelector = document.getElementById('mainEncodingSelector');
+        const toggleBtn = document.getElementById('toggleSettingsBtn');
+        const settingsOverlay = document.getElementById('settingsOverlay');
+        const backdrop = document.getElementById('settingsBackdrop');
+        const themeCircles = document.getElementById('themeCircles');
+        const fontFamilySelect = document.getElementById('fontFamilySelect');
+
+        // 悬浮栏
+        const topBar = document.getElementById('topBar');
+        const bottomBar = document.getElementById('bottomBar');
+
+        // 滑块元素 (无上下间距滑块)
+        const fontSizeSlider = document.getElementById('fontSizeSlider');
+        const fontSizeValue = document.getElementById('fontSizeValue');
+        const lineHeightSlider = document.getElementById('lineHeightSlider');
+        const lineHeightValue = document.getElementById('lineHeightValue');
+        const letterSpacingSlider = document.getElementById('letterSpacingSlider');
+        const letterSpacingValue = document.getElementById('letterSpacingValue');
+        const paraMarginSlider = document.getElementById('paraMarginSlider');
+        const paraMarginValue = document.getElementById('paraMarginValue');
+        const paddingXSlider = document.getElementById('paddingXSlider');
+        const paddingXValue = document.getElementById('paddingXValue');
+        // 无 paddingY 相关
+        const resetSpacingBtn = document.getElementById('resetSpacingBtn');
+
+        // 听书元素
+        const ttsSettingsBtn = document.getElementById('ttsSettingsBtn');
+        const ttsSettingsPanel = document.getElementById('ttsSettingsPanel');
+        const ttsVoiceSelect = document.getElementById('ttsVoiceSelect');
+        const ttsRate = document.getElementById('ttsRate');
+        const ttsRateValue = document.getElementById('ttsRateValue');
+        const ttsVolume = document.getElementById('ttsVolume');
+        const ttsVolumeValue = document.getElementById('ttsVolumeValue');
+        const playPauseBtn = document.getElementById('playPauseBtn');
+        const exitTtsBtn = document.getElementById('exitTtsBtn');
+
+        // ---------- 核心状态 ----------
+        let currentFile = null;
+        let fileContent = '';
+        let lines = [];
+        let currentEncoding = 'utf-8';
+        let isOpen = false;                 // 显示设置面板
+        let isTtsSettingsOpen = false;       // 听书面板
+        let isSliderDragging = false;
+        let currentProgressPercent = 0;
+
+        // 语音状态
+        let ttsUtterance = null;
+        let isSpeaking = false;
+        let ttsCurrentLineIdx = 0;
+
+        // 加载遮罩
+        const loadingOverlay = document.createElement('div');
+        loadingOverlay.className = 'loading-overlay';
+        loadingOverlay.innerHTML = '<div class="loading-spinner">加载中...</div>';
+        loadingOverlay.style.display = 'none';
+        readerDiv.parentNode.appendChild(loadingOverlay);
+        const showLoading = (show) => loadingOverlay.style.display = show ? 'flex' : 'none';
+
+        // 间距默认值 (不含上下边距)
+        const spacingDefaults = {
+            lineHeight: 1.6,
+            letterSpacing: 0.3,
+            paraMargin: 24,
+            paddingX: 200
+            // 无 paddingY
+        };
+
+        // ---------- 样式应用函数 ----------
+        // 仅应用间距相关样式 (行距、字距、段距、左右边距)
+        const applySpacingStylesOnly = () => {
+            readerDiv.style.lineHeight = lineHeightSlider.value;
+            readerDiv.style.letterSpacing = letterSpacingSlider.value + 'px';
+            // 上下边距固定为 24px，不再由滑块控制
+            readerDiv.style.padding = `24px ${paddingXSlider.value}px`;
+            document.querySelectorAll('.text-line').forEach(el => el.style.marginBottom = paraMarginSlider.value + 'px');
+        };
+
+        // 应用全部样式 (字体、字号 + 间距)
+        const applyFullStyles = () => {
+            readerDiv.style.fontFamily = fontFamilySelect.value;
+            readerDiv.style.fontSize = fontSizeSlider.value + 'px';
+            applySpacingStylesOnly();
+        };
+
+        // 重置为默认间距 (上下边距固定 24px)
+        const setSpacingDefaults = () => {
+            lineHeightSlider.value = spacingDefaults.lineHeight;
+            letterSpacingSlider.value = spacingDefaults.letterSpacing;
+            paraMarginSlider.value = spacingDefaults.paraMargin;
+            paddingXSlider.value = spacingDefaults.paddingX;
+
+            lineHeightValue.innerText = spacingDefaults.lineHeight.toFixed(1);
+            letterSpacingValue.innerText = spacingDefaults.letterSpacing.toFixed(1) + 'px';
+            paraMarginValue.innerText = spacingDefaults.paraMargin + 'px';
+            paddingXValue.innerText = spacingDefaults.paddingX + 'px';
+
+            applySpacingStylesOnly();
+        };
+
+        // 更新所有数值显示
+        const updateAllValueDisplays = () => {
+            fontSizeValue.innerText = fontSizeSlider.value + 'px';
+            lineHeightValue.innerText = parseFloat(lineHeightSlider.value).toFixed(1);
+            letterSpacingValue.innerText = parseFloat(letterSpacingSlider.value).toFixed(1) + 'px';
+            paraMarginValue.innerText = paraMarginSlider.value + 'px';
+            paddingXValue.innerText = paddingXSlider.value + 'px';
+        };
+
+        // ---------- 事件绑定 (滑块实时显示 + 最终应用) ----------
+        fontSizeSlider.addEventListener('input', () => fontSizeValue.innerText = fontSizeSlider.value + 'px');
+        fontSizeSlider.addEventListener('change', applyFullStyles);
+
+        lineHeightSlider.addEventListener('input', () => lineHeightValue.innerText = parseFloat(lineHeightSlider.value).toFixed(1));
+        lineHeightSlider.addEventListener('change', applyFullStyles);
+
+        letterSpacingSlider.addEventListener('input', () => letterSpacingValue.innerText = parseFloat(letterSpacingSlider.value).toFixed(1) + 'px');
+        letterSpacingSlider.addEventListener('change', applyFullStyles);
+
+        paraMarginSlider.addEventListener('input', () => paraMarginValue.innerText = paraMarginSlider.value + 'px');
+        paraMarginSlider.addEventListener('change', applyFullStyles);
+
+        paddingXSlider.addEventListener('input', () => paddingXValue.innerText = paddingXSlider.value + 'px');
+        paddingXSlider.addEventListener('change', applyFullStyles);
+
+        fontFamilySelect.addEventListener('change', applyFullStyles);
+        resetSpacingBtn.addEventListener('click', setSpacingDefaults);
+
+        // 主题切换
+        themeCircles.addEventListener('click', e => {
+            const circle = e.target.closest('.theme-circle');
+            if (!circle) return;
+            themeCircles.querySelectorAll('.theme-circle').forEach(c => c.classList.remove('selected'));
+            circle.classList.add('selected');
+            readerDiv.style.backgroundColor = circle.dataset.bg;
+            readerDiv.style.color = circle.dataset.text;
+        });
+
+        // ---------- 文件处理与渲染 ----------
+        const highlightLine = (index) => {
+            document.querySelectorAll('.text-line').forEach(el => el.classList.remove('highlight'));
+            const lines = document.querySelectorAll('.text-line');
+            if (lines[index]) lines[index].classList.add('highlight');
+        };
+
+        const formatPercent = (value) => parseFloat(value).toFixed(2) + '%';
+
+        const renderContentWithLines = (text) => {
+            if (!text || !text.trim()) {
+                readerDiv.innerHTML = '<div class="placeholder-tip">选择一个TXT文件</div>';
+                showLoading(false);
+                return;
+            }
+            showLoading(true);
+            setTimeout(() => {
+                lines = text.split(/\r?\n/);
+                readerDiv.innerHTML = '';
+                const fragment = document.createDocumentFragment();
+                lines.forEach(line => {
+                    const div = document.createElement('div');
+                    div.className = 'text-line';
+                    div.textContent = line || ' ';
+                    fragment.appendChild(div);
+                });
+                readerDiv.appendChild(fragment);
+                applyFullStyles();                              // 应用当前样式
+                showLoading(false);
+                fileNameDisplay.innerText = currentFile?.name?.length > 30 ? currentFile.name.slice(0,28)+'…' : currentFile?.name || '未加载';
+                // 恢复上次阅读进度
+                const maxScroll = readerDiv.scrollHeight - readerDiv.clientHeight;
+                readerDiv.scrollTop = maxScroll * (currentProgressPercent / 100);
+                updateProgress();
+            }, 30);
+        };
+
+        // 滚动进度更新
+        const updateProgress = () => {
+            if (!readerDiv.scrollHeight) return;
+            const maxScroll = readerDiv.scrollHeight - readerDiv.clientHeight;
+            const percent = maxScroll > 0 ? (readerDiv.scrollTop / maxScroll * 100) : 0;
+            currentProgressPercent = parseFloat(percent.toFixed(2));
+            progressValueSpan.innerText = formatPercent(currentProgressPercent);
+            if (!isSliderDragging) progressSlider.value = currentProgressPercent;
+        };
+
+        readerDiv.addEventListener('scroll', () => requestAnimationFrame(updateProgress));
+
+        // 进度条拖动
+        progressSlider.addEventListener('input', function() {
+            isSliderDragging = true;
+            progressValueSpan.innerText = formatPercent(this.value);
+        });
+        progressSlider.addEventListener('change', function() {
+            const targetPercent = parseFloat(this.value);
+            currentProgressPercent = targetPercent;
+            const maxScroll = readerDiv.scrollHeight - readerDiv.clientHeight;
+            readerDiv.scrollTop = maxScroll * (targetPercent / 100);
+            setTimeout(() => isSliderDragging = false, 50);
+        });
+
+        // 选择文件
+        selectFileBtn.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            currentFile = file;
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                fileContent = ev.target.result;
+                currentEncoding = mainEncodingSelector.value;
+                currentProgressPercent = 0;                     // 新文件进度归零
+                renderContentWithLines(fileContent);
+                readerDiv.scrollTop = 0;
+            };
+            reader.readAsText(file, mainEncodingSelector.value);
+        });
+
+        // 编码切换
+        mainEncodingSelector.addEventListener('change', function() {
+            if (currentFile) {
+                const reader = new FileReader();
+                reader.onload = e => {
+                    fileContent = e.target.result;
+                    renderContentWithLines(fileContent);
+                };
+                reader.readAsText(currentFile, mainEncodingSelector.value);
+            }
+        });
+
+        // ---------- 听书功能 (保持原逻辑，仅整理) ----------
+        const getMappedVolume = () => (parseFloat(ttsVolume.value) / 100) * 2.0;
+        const getCurrentVisibleLineIndex = () => {
+            const lineDivs = document.querySelectorAll('.text-line');
+            if (!lineDivs.length) return 0;
+            const containerTop = readerDiv.scrollTop;
+            const containerBottom = containerTop + readerDiv.clientHeight;
+            for (let i = 0; i < lineDivs.length; i++) {
+                const top = lineDivs[i].offsetTop;
+                const bottom = top + lineDivs[i].offsetHeight;
+                if (bottom > containerTop && top < containerBottom) return i;
+            }
+            const ratio = readerDiv.scrollTop / (readerDiv.scrollHeight - readerDiv.clientHeight) || 0;
+            return Math.floor(ratio * lineDivs.length);
+        };
+        const getVoiceForName = (name) => {
+            if (!window.speechSynthesis) return null;
+            const voices = window.speechSynthesis.getVoices();
+            const lowerName = name.toLowerCase();
+            for (let v of voices) {
+                const n = v.name.toLowerCase();
+                if (n.includes(lowerName) ||
+                    (lowerName === '希希' && n.includes('xiaoxiao')) ||
+                    (lowerName === '辉辉' && n.includes('huihui')) ||
+                    (lowerName === '瑶瑶' && n.includes('yaoyao')) ||
+                    (lowerName === '铮铮' && (n.includes('zheng') || n.includes('zhen'))) ||
+                    (lowerName === '薇薇' && (n.includes('wei') || n.includes('vivi'))) ||
+                    (lowerName === '彬彬' && (n.includes('bin') || n.includes('bing')))) {
+                    return v;
+                }
+            }
+            return null;
+        };
+        const speakLine = (text, idx) => {
+            if (!window.speechSynthesis) { alert('语音不支持'); return; }
+            if (ttsUtterance) window.speechSynthesis.cancel();
+            highlightLine(idx);
+            ttsUtterance = new SpeechSynthesisUtterance(text);
+            ttsUtterance.lang = 'zh-CN';
+            ttsUtterance.rate = parseFloat(ttsRate.value);
+            ttsUtterance.volume = getMappedVolume();
+            const selectedVoiceName = ttsVoiceSelect.value;
+            const matchedVoice = getVoiceForName(selectedVoiceName);
+            if (matchedVoice) ttsUtterance.voice = matchedVoice;
+            ttsUtterance.onend = () => {
+                if (isSpeaking) {
+                    ttsCurrentLineIdx = idx + 1;
+                    if (ttsCurrentLineIdx < lines.length) {
+                        const lineEls = document.querySelectorAll('.text-line');
+                        if (lineEls[ttsCurrentLineIdx]) {
+                            lineEls[ttsCurrentLineIdx].scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }
+                        speakLine(lines[ttsCurrentLineIdx], ttsCurrentLineIdx);
+                    } else stopTTS();
+                }
+            };
+            ttsUtterance.onerror = () => stopTTS();
+            window.speechSynthesis.speak(ttsUtterance);
+        };
+        const startTTS = () => {
+            if (!lines.length) return;
+            const startIdx = getCurrentVisibleLineIndex();
+            if (startIdx >= lines.length) { stopTTS(); return; }
+            isSpeaking = true;
+            playPauseBtn.classList.add('speaking');
+            playPauseBtn.innerText = '暂停';
+            ttsCurrentLineIdx = startIdx;
+            speakLine(lines[startIdx] || ' ', startIdx);
+        };
+        const pauseTTS = () => {
+            if (window.speechSynthesis) { window.speechSynthesis.pause(); isSpeaking = false; playPauseBtn.classList.remove('speaking'); playPauseBtn.innerText = '播放'; }
+        };
+        const resumeTTS = () => {
+            if (window.speechSynthesis) { window.speechSynthesis.resume(); isSpeaking = true; playPauseBtn.classList.add('speaking'); playPauseBtn.innerText = '暂停'; }
+        };
+        const stopTTS = () => {
+            if (window.speechSynthesis) window.speechSynthesis.cancel();
+            isSpeaking = false;
+            playPauseBtn.classList.remove('speaking');
+            playPauseBtn.innerText = '播放';
+            document.querySelectorAll('.text-line').forEach(el => el.classList.remove('highlight'));
+        };
+        playPauseBtn.addEventListener('click', () => {
+            if (!lines.length) return;
+            if (!window.speechSynthesis) { alert('语音不支持'); return; }
+            if (isSpeaking) pauseTTS();
+            else if (window.speechSynthesis.paused) resumeTTS();
+            else startTTS();
+        });
+        exitTtsBtn.addEventListener('click', stopTTS);
+
+        // 听书滑块联动
+        const updateTtsRateDisplay = () => ttsRateValue.innerText = Math.round(parseFloat(ttsRate.value) * 100) + '%';
+        const updateTtsVolumeDisplay = () => ttsVolumeValue.innerText = ttsVolume.value + '%';
+        let wasSpeakingBeforeAdjust = false;
+        ttsRate.addEventListener('input', () => { updateTtsRateDisplay(); if (isSpeaking) { wasSpeakingBeforeAdjust = true; pauseTTS(); } });
+        ttsRate.addEventListener('change', () => {
+            if (wasSpeakingBeforeAdjust && lines.length > 0) {
+                if (window.speechSynthesis) window.speechSynthesis.cancel();
+                setTimeout(() => {
+                    if (ttsCurrentLineIdx < lines.length) {
+                        isSpeaking = true;
+                        playPauseBtn.classList.add('speaking');
+                        playPauseBtn.innerText = '暂停';
+                        speakLine(lines[ttsCurrentLineIdx] || ' ', ttsCurrentLineIdx);
+                    }
+                }, 50);
+            }
+            wasSpeakingBeforeAdjust = false;
+        });
+        ttsVolume.addEventListener('input', () => { updateTtsVolumeDisplay(); if (isSpeaking) { wasSpeakingBeforeAdjust = true; pauseTTS(); } });
+        ttsVolume.addEventListener('change', () => {
+            if (wasSpeakingBeforeAdjust && lines.length > 0) {
+                if (window.speechSynthesis) window.speechSynthesis.cancel();
+                setTimeout(() => {
+                    if (ttsCurrentLineIdx < lines.length) {
+                        isSpeaking = true;
+                        playPauseBtn.classList.add('speaking');
+                        playPauseBtn.innerText = '暂停';
+                        speakLine(lines[ttsCurrentLineIdx] || ' ', ttsCurrentLineIdx);
+                    }
+                }, 50);
+            }
+            wasSpeakingBeforeAdjust = false;
+        });
+        ttsVoiceSelect.addEventListener('change', function() {
+            if (isSpeaking) {
+                wasSpeakingBeforeAdjust = true;
+                pauseTTS();
+                if (window.speechSynthesis) window.speechSynthesis.cancel();
+                setTimeout(() => {
+                    if (wasSpeakingBeforeAdjust && lines.length > 0 && ttsCurrentLineIdx < lines.length) {
+                        isSpeaking = true;
+                        playPauseBtn.classList.add('speaking');
+                        playPauseBtn.innerText = '暂停';
+                        speakLine(lines[ttsCurrentLineIdx] || ' ', ttsCurrentLineIdx);
+                    }
+                    wasSpeakingBeforeAdjust = false;
+                }, 60);
+            }
+        });
+        updateTtsRateDisplay(); updateTtsVolumeDisplay();
+
+        // ---------- 点击阅读区切换悬浮栏显隐 ----------
+        function toggleBars(show) {
+            if (show) {
+                topBar.classList.remove('hidden-bar');
+                bottomBar.classList.remove('hidden-bar');
+            } else {
+                // 隐藏时同时关闭所有面板
+                if (isOpen) closeSettings();
+                if (isTtsSettingsOpen) closeTtsSettings();
+                topBar.classList.add('hidden-bar');
+                bottomBar.classList.add('hidden-bar');
+            }
+        }
+
+        // 点击阅读区切换
+        readerDiv.addEventListener('click', function(e) {
+            // 如果任一栏显示，则隐藏；否则显示
+            if (!topBar.classList.contains('hidden-bar') || !bottomBar.classList.contains('hidden-bar')) {
+                toggleBars(false);
+            } else {
+                toggleBars(true);
+            }
+        });
+
+        // 阻止点击悬浮栏及面板的事件冒泡，避免误关闭
+        topBar.addEventListener('click', e => e.stopPropagation());
+        bottomBar.addEventListener('click', e => e.stopPropagation());
+        ttsSettingsPanel.addEventListener('click', e => e.stopPropagation());
+        settingsOverlay.addEventListener('click', e => e.stopPropagation());
+
+        // ---------- 面板开关 ----------
+        const openTtsSettings = () => {
+            isTtsSettingsOpen = true;
+            ttsSettingsPanel.classList.add('open');
+            ttsSettingsBtn.classList.add('active');
+            if (isOpen) closeSettings();
+        };
+        const closeTtsSettings = () => {
+            isTtsSettingsOpen = false;
+            ttsSettingsPanel.classList.remove('open');
+            ttsSettingsBtn.classList.remove('active');
+        };
+        ttsSettingsBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (topBar.classList.contains('hidden-bar')) toggleBars(true);
+            isTtsSettingsOpen ? closeTtsSettings() : openTtsSettings();
+        });
+        document.addEventListener('click', (e) => {
+            if (isTtsSettingsOpen && !ttsSettingsPanel.contains(e.target) && !ttsSettingsBtn.contains(e.target)) closeTtsSettings();
+        });
+
+        const openSettings = () => {
+            isOpen = true;
+            settingsOverlay.classList.add('open');
+            backdrop.classList.add('show');
+            toggleBtn.innerText = '隐藏设置';
+        };
+        const closeSettings = () => {
+            isOpen = false;
+            settingsOverlay.classList.remove('open');
+            backdrop.classList.remove('show');
+            toggleBtn.innerText = '显示设置';
+        };
+        toggleBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (topBar.classList.contains('hidden-bar')) toggleBars(true);
+            if (isOpen) closeSettings();
+            else {
+                if (isTtsSettingsOpen) closeTtsSettings();
+                openSettings();
+            }
+        });
+        backdrop.addEventListener('click', closeSettings);
+
+        // ---------- 初始化 ----------
+        setSpacingDefaults();
+        applyFullStyles();
+        updateAllValueDisplays();
+        progressValueSpan.innerText = '0.00%';
+        toggleBtn.innerText = '显示设置';
+        // 确保顶部栏和底部栏初始隐藏 (HTML 已有 hidden-bar 类，再显式设置一次)
+        topBar.classList.add('hidden-bar');
+        bottomBar.classList.add('hidden-bar');
+    })();
+</script>
+</body>
+</html>
